@@ -1,3 +1,26 @@
-:root { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color-scheme: dark; }
+@import "@fontsource-variable/space-grotesk/index.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+:root {
+  color-scheme: dark;
+  --bg: #04060f;
+  --bg-2: #0a1030;
+  --glass: rgba(12, 18, 42, 0.58);
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #eaf0ff;
+  --muted: #9aa6c8;
+  --cool: #38d6f5;
+  --warm: #ff8a4c;
+  --violet: #9d7bff;
+  --accent: var(--cool);
+  --radius: 18px;
+  --font: "Space Grotesk Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  font-family: var(--font);
+}
 * { box-sizing: border-box; }
-body { margin: 0; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+button { font: inherit; color: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

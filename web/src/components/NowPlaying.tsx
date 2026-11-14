@@ -1,17 +1,14 @@
 import type { Visualization } from "../types";
 
 interface Props {
-  catalog: Visualization[];
-  track: number;
+  viz: Visualization | undefined;
   frame: number;
-  onSelect: (i: number) => void;
   onSeek: (i: number) => void;
   description: string;
 }
 
-export default function NowPlaying({ catalog, track, frame, onSelect, onSeek, description }: Props) {
-  const viz = catalog[track];
-  if (!viz) return <p>Loading visualizations… (run the data pipeline if this never loads)</p>;
+export default function NowPlaying({ viz, frame, onSeek, description }: Props) {
+  if (!viz) return <p>Loading visualizations…</p>;
   const f = viz.frames[frame];
 
   return (
@@ -22,9 +19,12 @@ export default function NowPlaying({ catalog, track, frame, onSelect, onSeek, de
       <p className="live" aria-live="polite">
         {description}
       </p>
-      <label className="slider">
+      <label className="scrub">
         <span>
-          Frame {frame + 1} / {viz.frames.length}
+          <span className="eyebrow">Frame</span>
+          <output>
+            {String(frame + 1).padStart(2, "0")} / {viz.frames.length}
+          </output>
         </span>
         <input type="range" min={0} max={viz.frames.length - 1} value={frame} onChange={(e) => onSeek(Number(e.target.value))} />
       </label>
@@ -32,22 +32,9 @@ export default function NowPlaying({ catalog, track, frame, onSelect, onSeek, de
         <summary>About this visualization</summary>
         <p>{viz.description}</p>
         <a href={viz.sourceUrl} target="_blank" rel="noreferrer">
-          {viz.credits}
+          Source: NASA Scientific Visualization Studio #{viz.svsId}
         </a>
       </details>
-
-      <h2>Jukebox</h2>
-      <ol className="playlist">
-        {catalog.map((v, i) => (
-          <li key={v.slug}>
-            <button aria-current={i === track} onClick={() => onSelect(i)}>
-              <img src={v.frames[0]?.src} alt="" />
-              <span>{v.title}</span>
-              {v.projection === "equirect" && <em>on globe</em>}
-            </button>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }

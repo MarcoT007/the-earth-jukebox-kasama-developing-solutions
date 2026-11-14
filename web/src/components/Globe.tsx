@@ -1,5 +1,5 @@
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { OrbitControls, Stars } from "@react-three/drei";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
+import { Billboard, OrbitControls, Stars } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { Controls } from "../types";
@@ -11,6 +11,12 @@ interface GlobeProps {
   controls: Controls;
   energy: number; // 0..1 from the current frame
   level: () => number; // live audio loudness
+  spectrum: () => Float32Array; // live spectrum, 0..1
+  step: () => number; // step currently sounding, 0..7
+  melody: (string | null)[]; // which of the 8 steps carry a note
+  playing: boolean;
+  accent: string; // CSS colour of the current frame
+  reducedMotion: boolean;
 }
 
 const atmosphereShader = {
@@ -52,26 +58,26 @@ function useSmoothTexture(url: string, fallback: THREE.Texture) {
   return tex;
 }
 
-function Planet({ textureUrl, controls, energy, level }: GlobeProps) {
+function Planet({ textureUrl, controls, energy, level, reducedMotion }: GlobeProps) {
   const base = useLoader(THREE.TextureLoader, BASE_TEXTURE);
   base.colorSpace = THREE.SRGBColorSpace;
   const texture = useSmoothTexture(textureUrl, base);
   const earth = useRef<THREE.Mesh>(null);
   const material = useRef<THREE.MeshStandardMaterial>(null);
   const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color("#4da6ff") }, uIntensity: { value: 1 } }), []);
-  const cool = useMemo(() => new THREE.Color("#4da6ff"), []);
+  const cool = useMemo(() => new THREE.Color("#3fb8ff"), []);
   const warm = useMemo(() => new THREE.Color("#ff6a3d"), []);
 
   useFrame((_, dt) => {
     const loud = level();
     // Sound -> planet: tempo drives rotation, loudness makes the atmosphere pulse,
     // warmth tints the planet and its atmosphere (cool blue <-> overheated orange).
-    if (earth.current) earth.current.rotation.y += dt * (controls.tempo / 600);
+    if (earth.current) earth.current.rotation.y += dt * (controls.tempo / (reducedMotion ? 2400 : 600));
     const t = Math.max(0, controls.warmth);
     uniforms.uColor.value.copy(cool).lerp(warm, t);
     uniforms.uIntensity.value = 0.8 + loud * 2.5 + energy * 0.5;
     if (material.current) {
-      material.current.color.setRGB(1, 1 - Math.max(0, controls.warmth) * 0.35, 1 - Math.max(0, controls.warmth) * 0.5);
+      material.current.color.setRGB(1, 1 - t * 0.35, 1 - t * 0.5);
       material.current.emissiveIntensity = 0.15 + loud * 0.6;
     }
   });
@@ -82,7 +88,7 @@ function Planet({ textureUrl, controls, energy, level }: GlobeProps) {
         <sphereGeometry args={[2, 96, 96]} />
         <meshStandardMaterial ref={material} map={texture} emissiveMap={texture} emissive="#ffffff" emissiveIntensity={0.15} roughness={0.9} />
       </mesh>
-      <mesh scale={1.18}>
+      <mesh scale={1.16}>
         <sphereGeometry args={[2, 64, 64]} />
         <shaderMaterial args={[atmosphereShader]} uniforms={uniforms} blending={THREE.AdditiveBlending} side={THREE.BackSide} transparent depthWrite={false} />
       </mesh>
@@ -90,17 +96,91 @@ function Planet({ textureUrl, controls, energy, level }: GlobeProps) {
   );
 }
 
+const BARS = 96;
+const STEPS = 8;
+const SEG = (Math.PI * 2) / STEPS;
+const GAP = 0.06;
+
+/**
+ * The "record needle": 8 arcs = the 8 steps of the melody (clockwise from the top),
+ * surrounded by a circular spectrum of the live audio.
+ */
+function SoundRing({ spectrum, step, melody, playing, accent }: GlobeProps) {
+  const bars = useRef<THREE.InstancedMesh>(null);
+  const arcs = useRef<(THREE.Mesh | null)[]>([]);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useFrame(() => {
+    const data = spectrum();
+    if (bars.current) {
+      for (let i = 0; i < BARS; i++) {
+        const k = i < BARS / 2 ? i : BARS - 1 - i; // mirror left/right
+        const v = data[Math.floor((k / (BARS / 2)) * data.length * 0.75)] ?? 0;
+        const len = 0.03 + v * 0.5;
+        const a = (i / BARS) * Math.PI * 2 + Math.PI / 2;
+        const r = 2.7 + len / 2;
+        dummy.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+        dummy.rotation.set(0, 0, a);
+        dummy.scale.set(len, 1, 1);
+        dummy.updateMatrix();
+        bars.current.setMatrixAt(i, dummy.matrix);
+      }
+      bars.current.instanceMatrix.needsUpdate = true;
+    }
+    const now = step();
+    arcs.current.forEach((mesh, i) => {
+      if (!mesh) return;
+      const active = playing && i === now;
+      (mesh.material as THREE.MeshBasicMaterial).opacity = active ? 1 : melody[i] ? 0.4 : 0.1;
+      mesh.scale.setScalar(active ? 1.025 : 1);
+    });
+  });
+
+  return (
+    <Billboard>
+      {Array.from({ length: STEPS }, (_, i) => (
+        <mesh
+          key={i}
+          ref={(m) => {
+            arcs.current[i] = m;
+          }}
+          rotation={[0, 0, Math.PI / 2 - (i + 1) * SEG + GAP / 2]}
+        >
+          <torusGeometry args={[2.55, 0.022, 8, 32, SEG - GAP]} />
+          <meshBasicMaterial color={accent} transparent opacity={0.2} toneMapped={false} />
+        </mesh>
+      ))}
+      <instancedMesh ref={bars} args={[undefined, undefined, BARS]}>
+        <boxGeometry args={[1, 0.022, 0.01]} />
+        <meshBasicMaterial color={accent} transparent opacity={0.85} toneMapped={false} />
+      </instancedMesh>
+    </Billboard>
+  );
+}
+
+/** Keeps the whole ring visible on narrow (portrait) screens. */
+function FitCamera() {
+  const { camera, size } = useThree();
+  useEffect(() => {
+    const aspect = size.width / size.height;
+    camera.position.setLength(7.8 * Math.max(1, 1.15 / aspect));
+    camera.updateProjectionMatrix();
+  }, [camera, size]);
+  return null;
+}
+
 export default function Globe(props: GlobeProps) {
   return (
-    <Canvas camera={{ position: [0, 0, 6], fov: 45 }} aria-hidden="true">
-      <color attach="background" args={["#02030a"]} />
+    <Canvas camera={{ position: [0, 0, 7.8], fov: 45 }} aria-hidden="true">
+      <FitCamera />
       <ambientLight intensity={0.35} />
       <directionalLight position={[5, 3, 5]} intensity={2.2} />
-      <Stars radius={80} depth={40} count={4000} factor={3} fade speed={0.5 + props.controls.tempo / 120} />
+      <Stars radius={90} depth={40} count={3500} factor={3} fade speed={props.reducedMotion ? 0 : 0.5 + props.controls.tempo / 120} />
       <Suspense fallback={null}>
         <Planet {...props} />
       </Suspense>
-      <OrbitControls enablePan={false} minDistance={3} maxDistance={12} />
+      <SoundRing {...props} />
+      <OrbitControls enablePan={false} minDistance={5} maxDistance={18} />
     </Canvas>
   );
 }

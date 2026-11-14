@@ -69,6 +69,11 @@ export class JukeboxEngine {
     return typeof v === "number" ? v : v[0];
   }
 
+  /** Step of the bar that is currently sounding (0..7), for the visualizers. */
+  currentStep(): number {
+    return (this.step + 7) % 8;
+  }
+
   async play() {
     if (!this.ready) {
       await Tone.start(); // browsers need a user gesture before audio
