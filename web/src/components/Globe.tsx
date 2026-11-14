@@ -17,6 +17,7 @@ interface GlobeProps {
   playing: boolean;
   accent: string; // CSS colour of the current frame
   reducedMotion: boolean;
+  onView: (lat: number, lon: number) => void; // point of the planet facing the viewer
 }
 
 const atmosphereShader = {
@@ -58,7 +59,10 @@ function useSmoothTexture(url: string, fallback: THREE.Texture) {
   return tex;
 }
 
-function Planet({ textureUrl, controls, energy, level, reducedMotion }: GlobeProps) {
+function Planet({ textureUrl, controls, energy, level, reducedMotion, onView }: GlobeProps) {
+  const camera = useThree((s) => s.camera);
+  const facing = useMemo(() => new THREE.Vector3(), []);
+  const sinceReport = useRef(0);
   const base = useLoader(THREE.TextureLoader, BASE_TEXTURE);
   base.colorSpace = THREE.SRGBColorSpace;
   const texture = useSmoothTexture(textureUrl, base);
@@ -73,6 +77,12 @@ function Planet({ textureUrl, controls, energy, level, reducedMotion }: GlobePro
     // Sound -> planet: tempo drives rotation, loudness makes the atmosphere pulse,
     // warmth tints the planet and its atmosphere (cool blue <-> overheated orange).
     if (earth.current) earth.current.rotation.y += dt * (controls.tempo / (reducedMotion ? 2400 : 600));
+    sinceReport.current += dt;
+    if (earth.current && sinceReport.current > 0.6) {
+      sinceReport.current = 0;
+      earth.current.worldToLocal(facing.copy(camera.position)).normalize();
+      onView(THREE.MathUtils.radToDeg(Math.asin(facing.y)), THREE.MathUtils.radToDeg(Math.atan2(-facing.z, facing.x)));
+    }
     const t = Math.max(0, controls.warmth);
     uniforms.uColor.value.copy(cool).lerp(warm, t);
     uniforms.uIntensity.value = 0.8 + loud * 2.5 + energy * 0.5;

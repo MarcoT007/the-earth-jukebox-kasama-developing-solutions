@@ -4,6 +4,8 @@ import Modulator from "./components/Modulator";
 import NowPlaying from "./components/NowPlaying";
 import Dock from "./components/Dock";
 import Missions from "./components/Missions";
+import News from "./components/News";
+import { regionAt } from "./regions";
 import { kidDescribe, MISSIONS } from "./kids";
 import { JukeboxEngine } from "./audio/engine";
 import { getSpectrum } from "./audio/analysis";
@@ -34,8 +36,12 @@ export default function App() {
   const [completed, setCompleted] = useState<string[]>(() => JSON.parse(localStorage.getItem("ej-missions") ?? "[]"));
   const [heard, setHeard] = useState<string[]>([]);
   const [toast, setToast] = useState("");
-  const [tab, setTab] = useState<"playing" | "missions">("playing");
+  const [tab, setTab] = useState<"playing" | "news" | "missions">(() => (new URLSearchParams(location.search).get("tab") === "news" ? "news" : "playing"));
+  const [region, setRegion] = useState<string | null>(null);
   const engine = useRef<JukeboxEngine | null>(null);
+
+  // The globe reports which point faces the viewer (about twice a second).
+  const onView = useCallback((lat: number, lon: number) => setRegion(regionAt(lat, lon)), []);
 
   useEffect(() => {
     fetch("data/catalog.json")
@@ -132,6 +138,7 @@ export default function App() {
           playing={playing}
           accent={accent}
           reducedMotion={reducedMotion}
+          onView={onView}
         />
       </div>
 
@@ -143,7 +150,7 @@ export default function App() {
           </h1>
         </div>
         <p>Listen to NASA’s Earth Information Center</p>
-        <button className="switch" role="switch" aria-checked={kids} onClick={() => { setKids(!kids); setTab("playing"); }}>
+        <button className="switch" role="switch" aria-checked={kids} onClick={() => { setKids(!kids); if (tab === "missions") setTab("playing"); }}>
           <span className="switch-track" aria-hidden="true" />
           Kids mode
         </button>
@@ -153,19 +160,24 @@ export default function App() {
         <Modulator controls={controls} onChange={setControls} music={music} kids={kids} />
       </aside>
 
-      <aside className="panel glass right" aria-label="Now playing">
-        {kids && (
-          <div className="tabs" role="tablist">
-            <button role="tab" aria-selected={tab === "playing"} onClick={() => setTab("playing")}>
-              Now playing
-            </button>
+      <aside className="panel glass right" aria-label="Now playing, news and missions">
+        <div className="tabs" role="tablist">
+          <button role="tab" aria-selected={tab === "playing"} onClick={() => setTab("playing")}>
+            Playing
+          </button>
+          <button role="tab" aria-selected={tab === "news"} onClick={() => setTab("news")}>
+            News
+          </button>
+          {kids && (
             <button role="tab" aria-selected={tab === "missions"} onClick={() => setTab("missions")}>
               Missions {completed.length}/{MISSIONS.length}
             </button>
-          </div>
-        )}
+          )}
+        </div>
         {kids && tab === "missions" ? (
           <Missions completed={completed} onReset={() => setCompleted([])} />
+        ) : tab === "news" ? (
+          <News regionInView={region} kids={kids} />
         ) : (
           <NowPlaying
             viz={viz}

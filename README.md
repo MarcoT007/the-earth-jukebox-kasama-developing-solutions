@@ -28,6 +28,21 @@ and the **jukebox** on the right lets you pick a visualization and follow its fr
 4. **Equirectangular sources** (ocean currents, ISS lightning) are wrapped directly onto the 3D globe;
    the other visualizations are shown as "album covers" with the NASA Blue Marble (GIBS) on the globe.
 
+## Kids mode
+
+A switch in the top bar turns the jukebox into a learning tool: plain-language controls (Speed, Heat, Notes, Echo),
+a short "What am I hearing?" story for every record, four missions that teach how pictures become sound
+(progress is saved in the browser), and simple climate actions with a link to NASA Science for Kids.
+
+## News
+
+The News tab shows Earth stories from the NASA Earth Observatory feed and, outside kids mode, climate headlines
+for the region of the planet currently facing the viewer (or a region picked from the list).
+Headlines are collected by `pipeline/fetch_news.py`, which GitHub Actions runs four times a day, so the app never
+depends on a live news service. Regional headlines come from Google News RSS and link to external sites.
+
+Handy links: add `?kids` to open in kids mode, `?tab=news` to open the news tab.
+
 ## Accessibility
 
 - Every frame has an automatically generated plain-language description, announced by screen readers (`aria-live`).
