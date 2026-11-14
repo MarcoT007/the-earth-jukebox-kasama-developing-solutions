@@ -3,6 +3,8 @@ import Globe, { BASE_TEXTURE } from "./components/Globe";
 import Modulator from "./components/Modulator";
 import NowPlaying from "./components/NowPlaying";
 import Dock from "./components/Dock";
+import Missions from "./components/Missions";
+import { kidDescribe, MISSIONS } from "./kids";
 import { JukeboxEngine } from "./audio/engine";
 import { getSpectrum } from "./audio/analysis";
 import { describe, type MusicalFrame } from "./audio/mapping";
@@ -28,6 +30,11 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(() => new URLSearchParams(location.search).has("nointro"));
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
+  const [kids, setKids] = useState(() => new URLSearchParams(location.search).has("kids") || localStorage.getItem("ej-kids") === "1");
+  const [completed, setCompleted] = useState<string[]>(() => JSON.parse(localStorage.getItem("ej-missions") ?? "[]"));
+  const [heard, setHeard] = useState<string[]>([]);
+  const [toast, setToast] = useState("");
+  const [tab, setTab] = useState<"playing" | "missions">("playing");
   const engine = useRef<JukeboxEngine | null>(null);
 
   useEffect(() => {
@@ -80,6 +87,30 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [togglePlay, selectTrack, track]);
 
+  useEffect(() => localStorage.setItem("ej-kids", kids ? "1" : "0"), [kids]);
+  useEffect(() => localStorage.setItem("ej-missions", JSON.stringify(completed)), [completed]);
+
+  // Remember which records were played (for the "Sound explorer" mission).
+  useEffect(() => {
+    if (playing && viz) setHeard((h) => (h.includes(viz.slug) ? h : [...h, viz.slug]));
+  }, [playing, viz]);
+
+  // Kids mode: check the missions whenever something changes.
+  useEffect(() => {
+    if (!kids) return;
+    const state = { playing, slug: viz?.slug, controls, mode: music?.mode, heard: heard.length };
+    const won = MISSIONS.filter((m) => !completed.includes(m.id) && m.done(state));
+    if (!won.length) return;
+    setCompleted((c) => [...c, ...won.map((m) => m.id)]);
+    setToast(`Mission complete: ${won[0].title}! ${won[0].learned}`);
+  }, [kids, playing, viz, controls, music, heard, completed]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   const current = viz?.frames[frame];
   const textureUrl = viz?.projection === "equirect" && current ? current.src : BASE_TEXTURE;
   const accent = useMemo(() => accentOf(current), [current]);
@@ -88,7 +119,7 @@ export default function App() {
   const melody = music?.melody ?? [];
 
   return (
-    <div className="app" style={{ "--accent": accent } as CSSProperties}>
+    <div className={`app${kids ? " kids" : ""}`} style={{ "--accent": accent } as CSSProperties}>
       <div className="stage">
         <Globe
           textureUrl={textureUrl}
@@ -112,15 +143,43 @@ export default function App() {
           </h1>
         </div>
         <p>Listen to NASA’s Earth Information Center</p>
+        <button className="switch" role="switch" aria-checked={kids} onClick={() => { setKids(!kids); setTab("playing"); }}>
+          <span className="switch-track" aria-hidden="true" />
+          Kids mode
+        </button>
       </header>
 
       <aside className="panel glass left" aria-label="Sound modulator">
-        <Modulator controls={controls} onChange={setControls} music={music} />
+        <Modulator controls={controls} onChange={setControls} music={music} kids={kids} />
       </aside>
 
       <aside className="panel glass right" aria-label="Now playing">
-        <NowPlaying viz={viz} frame={frame} onSeek={(i) => engine.current?.seek(i)} description={current && music ? describe(current, music) : ""} />
+        {kids && (
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={tab === "playing"} onClick={() => setTab("playing")}>
+              Now playing
+            </button>
+            <button role="tab" aria-selected={tab === "missions"} onClick={() => setTab("missions")}>
+              Missions {completed.length}/{MISSIONS.length}
+            </button>
+          </div>
+        )}
+        {kids && tab === "missions" ? (
+          <Missions completed={completed} onReset={() => setCompleted([])} />
+        ) : (
+          <NowPlaying
+            viz={viz}
+            frame={frame}
+            kids={kids}
+            onSeek={(i) => engine.current?.seek(i)}
+            description={!current || !music ? "" : kids ? kidDescribe(current, music) : describe(current, music)}
+          />
+        )}
       </aside>
+
+      <div className="toast" role="status" aria-live="polite">
+        {toast && <span className="glass">★ {toast}</span>}
+      </div>
 
       <Dock catalog={catalog} track={track} playing={playing} onSelect={selectTrack} onToggle={togglePlay} />
 

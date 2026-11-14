@@ -2,12 +2,14 @@ import { useEffect, useRef } from "react";
 import { getWaveform } from "../audio/analysis";
 import type { MusicalFrame } from "../audio/mapping";
 import { DEFAULT_CONTROLS, type Controls } from "../types";
+import { KID_KNOBS } from "../kids";
 import Knob from "./Knob";
 
 interface Props {
   controls: Controls;
   onChange: (c: Controls) => void;
   music: MusicalFrame | null;
+  kids: boolean;
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -51,14 +53,14 @@ function Scope() {
   return <canvas ref={ref} className="scope" width={480} height={140} aria-hidden="true" />;
 }
 
-export default function Modulator({ controls, onChange, music }: Props) {
+export default function Modulator({ controls, onChange, music, kids }: Props) {
   return (
     <div className="modulator">
-      <h2>Modulator</h2>
+      <h2>{kids ? "Sound machine" : "Modulator"}</h2>
       <div className="readout">
         <div>
-          <span className="eyebrow">Key</span>
-          <strong>{music ? `${NOTE_NAMES[music.root]} ${music.mode}` : "—"}</strong>
+          <span className="eyebrow">{kids ? "Mood" : "Key"}</span>
+          <strong>{!music ? "—" : kids ? (music.mode === "major" ? "Happy" : "Calm") : `${NOTE_NAMES[music.root]} ${music.mode}`}</strong>
         </div>
         <div>
           <span className="eyebrow">Energy</span>
@@ -72,8 +74,8 @@ export default function Modulator({ controls, onChange, music }: Props) {
         {KNOBS.map((k) => (
           <Knob
             key={k.key}
-            label={k.label}
-            hint={k.hint}
+            label={kids ? KID_KNOBS[k.key].label : k.label}
+            hint={kids ? KID_KNOBS[k.key].hint : k.hint}
             min={k.min}
             max={k.max}
             step={k.step}
@@ -84,7 +86,7 @@ export default function Modulator({ controls, onChange, music }: Props) {
           />
         ))}
       </div>
-      <p className="tip">Drag a knob up or down, or use the arrow keys. Double-click to reset.</p>
+      <p className="tip">{kids ? "Drag a knob up or down and listen to what changes!" : "Drag a knob up or down, or use the arrow keys. Double-click to reset."}</p>
     </div>
   );
 }
