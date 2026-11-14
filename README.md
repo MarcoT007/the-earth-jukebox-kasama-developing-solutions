@@ -6,6 +6,26 @@ An interactive web jukebox that turns NASA Earth Information Center (EIC) visual
 A 3D Earth sits in the middle, a **modulator** on the left shapes the sound (and the planet reacts),
 and the **jukebox** on the right lets you pick a visualization and follow its frames.
 
+## Two versions
+
+| | Folder | Live |
+|---|---|---|
+| **v1** – dark "mission control" theme | `web/` (git tag `v1`) | <https://marcot007.github.io/the-earth-jukebox-kasama-developing-solutions/> |
+| **v2** – daylight theme, playable wave, Climate Time Machine | `web-v2/` | <https://marcot007.github.io/the-earth-jukebox-kasama-developing-solutions/v2/> |
+
+### What is new in v2
+
+- **Play the wave.** Drag the wave up/down to change its energy and left/right to change the tempo, and pick its shape
+  (sine, triangle, square, saw). The same controls exist as knobs for keyboard and screen-reader users.
+- **Climate Time Machine (real data).** The first record shows land temperature from 1950 to 2100 from NASA's
+  NEX-GDDP-CMIP6 dataset ([SVS #5343](https://svs.gsfc.nasa.gov/5343/)): downscaled output of the CMIP6 climate models
+  used by the IPCC Sixth Assessment Report. The energy of the wave selects one of the four emissions scenarios
+  (SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5), so the planet changes according to published model results, not to an
+  invented effect. These are scenario-based projections, not forecasts. Built by `pipeline/build_time_machine.py`.
+- **Heat you can hear.** A land heat index (0-100, computed from the frames) raises the pitch, turns the harmony minor
+  and adds a dissonant note as the land gets hotter.
+- **News and kids mode always in view**: a live headline bar and a kids switch in the top bar, colour-coded tabs.
+
 ## How it works
 
 1. **Data pipeline** (`pipeline/build_dataset.py`) downloads frames from NASA Scientific Visualization Studio (SVS)
@@ -71,6 +91,7 @@ cd web && npm install && npm run dev
 - [A 3D View of an Atmospheric River](https://svs.gsfc.nasa.gov/4960/)
 - [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/)
 - [Air Quality Model Runs](https://svs.gsfc.nasa.gov/5533/)
+- [NEX GDDP CMIP6 Historical and Predicted Global Maximum Monthly Temperature 1950-2100](https://svs.gsfc.nasa.gov/5343/) (v2)
 - [NASA GIBS – Blue Marble Shaded Relief & Bathymetry](https://nasa-gibs.github.io/gibs-api-docs/)
 
 ## Use of AI

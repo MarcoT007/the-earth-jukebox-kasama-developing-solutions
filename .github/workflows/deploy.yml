@@ -27,6 +27,12 @@ jobs:
         continue-on-error: true
       - run: npm ci && npm run build
         working-directory: web
+      - name: Build v2 (served at /v2/)
+        run: |
+          cp ../web/public/data/news.json public/data/news.json
+          npm ci && npm run build
+          cp -r dist ../web/dist/v2
+        working-directory: web-v2
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
